@@ -7,6 +7,7 @@ import logging
 from datetime import datetime, timezone, timedelta
 # import concurrent.futures
 # import threading
+from prometheus_client import CollectorRegistry, Gauge, push_to_gateway, Counter
 
 import boto3
 import botocore
@@ -64,9 +65,25 @@ def get_accounts(saa_url, saa_token, query_type):
     return response
 
 
-def clean_accounts(saa_api_key, saa_url):
-    saa_token = get_token(saa_api_key, saa_url)
+def push_to_prometheus(push_gw_url, job_name, metric_name, description, value, labels=None, instance='check_cleanup'):
+    labels_names = ['instance']
+    labels_values = [instance]
+    registry = CollectorRegistry()
+    if labels and isinstance(labels, dict):
+        for k,v in labels.items():
+            labels_names.append(k)
+            labels_values.append(v)
+    g = Gauge(metric_name, description, labels_names, registry=registry)
+    g.labels(*labels_values).set(value)
+    try:
+        logging.info(f"Pushing metrics to prometheus{push_gw_url}")
+        push_to_gateway(push_gw_url, job=job_name, registry=registry)
+    except Exception as e:
+        logging.error(f"Error sending metrics to pushgateway {push_gw_url} with error {e}")
 
+
+def clean_accounts(saa_api_key, saa_url, push_gw_url):
+    saa_token = get_token(saa_api_key, saa_url)
     need_clean_accounts = get_accounts(saa_url, saa_token, 'cleanup')
     if need_clean_accounts:
         logging.info("Accounts needing cleanup:")
@@ -75,18 +92,23 @@ def clean_accounts(saa_api_key, saa_url):
             cloud_provider = account['cloud_provider']['S']
             account_name = account['account_name']['S']
             ibm_api_key = account['master_api_key']['S']
+            labels = {'account': account_name, 'cloud_provider': cloud_provider, 'status': 'failed'}
             logging.info(f"Starting clean of account {account_name}")
             cleaning = clean_ibm_sandbox.clean(ibm_api_key)
             if not cleaning:
                 logging.info(
                     f"No resources found in account {account_name}; marking cleanup timestamp.")
+                clean_status = 0
                 response = update_account(saa_url, saa_token, account_name,
                                           cloud_provider, 'cleanup')
             else:
                 logging.error(
                     f"Account {account['account_name']} in cloud provider {account['cloud_provider']} could not be fully cleaned.")
+                clean_status = 1
                 response = update_account(saa_url, saa_token, account_name,
                                           cloud_provider, 'cleanup')
+
+            push_to_prometheus(push_gw_url, 'clean_accounts', 'ibm_clean_accounts', 'Resource to be clean by account', clean_status, labels)
             return response
 
     else:
@@ -94,7 +116,7 @@ def clean_accounts(saa_api_key, saa_url):
         return
 
 
-def verify_accounts(saa_api_key, saa_url):
+def verify_accounts(saa_api_key, saa_url, push_gw_url):
     billing_table = os.environ.get('IBM_USAGE_DB')
     aws_access_key_id = os.environ.get('AWS_ACCESS_KEY_ID')
     aws_secret_access_key = os.environ.get('AWS_SECRET_ACCESS_KEY')
@@ -124,6 +146,8 @@ def verify_accounts(saa_api_key, saa_url):
         logging.info(f"Starting verification of account {account_name}")
         cleanup_time = datetime.fromisoformat(account['cleanup_time']['S'])
         verification_time = cleanup_time + timedelta(hours=3)
+        labels = {'account': account_name, 'cloud_provider': cloud_provider}
+
         if datetime.now(timezone.utc) >= verification_time:
             logging.info(f"Evaluating account {account['account_name']['S']}.")
             previous_usage = db.query(
@@ -168,6 +192,9 @@ def verify_accounts(saa_api_key, saa_url):
                 current_usage['Items'][0]['billable_cost']['N'])
             previous_cost = float(
                 previous_usage['Items'][0]['billable_cost']['N'])
+
+            push_to_prometheus(push_gw_url, 'verify_accounts', 'ibm_current_usage', 'Current usage by account',
+                               current_cost, labels)
 
             if current_cost > previous_cost:
                 logging.warning(
@@ -217,9 +244,13 @@ def main(api_key=None):
     if saa_url is None:
         logging.error("Sandbox assignment API URL must be set as env variable")
 
-    clean_accounts(saa_api_key, saa_url)
+    push_gw_url = os.environ.get('PUSH_GATEWAY_URL')
+    if push_gw_url is None:
+        logging.error("Push Gatwway asssignment PUSH_GATEWAY_URL must be set as env variable")
 
-    verify_accounts(saa_api_key, saa_url)
+    clean_accounts(saa_api_key, saa_url, push_gw_url)
+
+    verify_accounts(saa_api_key, saa_url, push_gw_url)
 
 
 if __name__ == "__main__":
