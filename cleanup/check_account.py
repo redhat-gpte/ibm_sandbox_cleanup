@@ -196,6 +196,9 @@ def verify_accounts(saa_api_key, saa_url, push_gw_url):
             push_to_prometheus(push_gw_url, 'verify_accounts', 'ibm_current_usage', 'Current usage by account',
                                current_cost, labels)
 
+            push_to_prometheus(push_gw_url, 'verify_accounts', 'ibm_previous_usage', 'Previous usage by account',
+                               previous_cost, labels)
+
             if current_cost > previous_cost:
                 logging.warning(
                     f"The current charges of {current_cost} are greater than the previous charges of {previous_cost} in account {account_name}.")
