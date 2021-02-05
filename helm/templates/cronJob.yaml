@@ -1,0 +1,44 @@
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: {{ include "ibm-sandbox-cleanup.fullname" . }}
+  labels:
+    {{- include "ibm-sandbox-cleanup.labels" . | nindent 4 }}
+spec:
+  schedule: "*/30 * * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - env:
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  key: aws_access_key_id
+                  name: ibm-sandbox-cleanup-dynamodb
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: aws_secret_access_key
+                  name: ibm-sandbox-cleanup-dynamodb
+            - name: AWS_REGION
+              valueFrom:
+                secretKeyRef:
+                  key: aws_region
+                  name: ibm-sandbox-cleanup-dynamodb
+            - name: SAA_URL
+              value: "{{ .Values.sandboxAccountAssignmentApi.url }}"
+            - name: IBM_USAGE_DB
+              value: sandbox_billing
+            - name: SAA_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: api_key
+                  name: ibm-sandbox-cleanup-saa-credential
+            - name: PUSH_GATEWAY_URL
+              value: "{{ .Values.pushGateway }}"
+            image: "{{ .Values.image.repository }}:v{{ .Values.image.tag | default .Chart.AppVersion }}"
+            imagePullPolicy: IfNotPresent
+            name: cleanup
+          restartPolicy: Never
