@@ -150,6 +150,8 @@ def verify_accounts(saa_api_key, saa_url, push_gw_url):
 
         if datetime.now(timezone.utc) >= verification_time:
             logging.info(f"Evaluating account {account['account_name']['S']}.")
+            previous_usage_time = (datetime.now(timezone.utc) - timedelta(hours=2, minutes=20)).strftime('%Y-%m-%dT%H')
+            logging.info(f"Previous usage timestamp is {previous_usage_time}")
             previous_usage = db.query(
                 TableName=billing_table,
                 KeyConditionExpression='account_name = :an AND begins_with(#t, :ts)',
@@ -158,7 +160,7 @@ def verify_accounts(saa_api_key, saa_url, push_gw_url):
                         "S": account_name
                     },
                     ":ts": {
-                        "S": (datetime.now(timezone.utc) - timedelta(hours=2, minutes=20)).strftime('%Y-%m-%dT%H')
+                        "S": previous_usage_time
                     }
                 },
                 ExpressionAttributeNames={
@@ -169,6 +171,8 @@ def verify_accounts(saa_api_key, saa_url, push_gw_url):
             logging.info(
                 f"{account_name} previous usage is {previous_usage['Items'][0]['billable_cost']['N']}")
 
+            current_usage_time = (datetime.now(timezone.utc) - timedelta(minutes=20)).strftime('%Y-%m-%dT%H')
+            logging.info(f"Current usage timestamp is {current_usage_time}")
             current_usage = db.query(
                 TableName=billing_table,
                 KeyConditionExpression='account_name = :an AND begins_with(#t, :ts)',
@@ -177,7 +181,7 @@ def verify_accounts(saa_api_key, saa_url, push_gw_url):
                         "S": account_name
                     },
                     ":ts": {
-                        "S": (datetime.now(timezone.utc) - timedelta(minutes=20)).strftime('%Y-%m-%dT%H')
+                        "S": current_usage_time
                     }
                 },
                 ExpressionAttributeNames={
@@ -249,7 +253,7 @@ def main(api_key=None):
 
     push_gw_url = os.environ.get('PUSH_GATEWAY_URL')
     if push_gw_url is None:
-        logging.error("Push Gatwway asssignment PUSH_GATEWAY_URL must be set as env variable")
+        logging.error("Push Gateway asssignment PUSH_GATEWAY_URL must be set as env variable")
 
     clean_accounts(saa_api_key, saa_url, push_gw_url)
 
