@@ -1,17 +1,17 @@
-FROM registry.redhat.io/ubi8:latest
+FROM registry.access.redhat.com/ubi8/python-38:latest
   
 MAINTAINER Nate Stephany <nate@redhat.com>
 
-USER root
+USER 0
 
-RUN yum install -y python38 && yum clean all
+COPY cleanup/ /tmp/src
 
-COPY ./cleanup/ /app/
-
-RUN python3 -m pip install -r /app/requirements.txt
+RUN chown -R 1001 /tmp/src && \
+    chgrp -R 0 /tmp/src && \
+    chmod -R g+w /tmp/src
 
 USER 1001
 
-CMD ["/app/check_account.py"]
+RUN /usr/libexec/s2i/assemble
 
-ENTRYPOINT ["python3"]
+CMD ["/usr/libexec/s2i/run"]
