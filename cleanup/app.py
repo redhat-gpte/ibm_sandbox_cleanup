@@ -1,12 +1,11 @@
 import os
 import sys
-import urllib
+import urllib3
 import argparse
 import json
 import logging
 from datetime import datetime, timezone, timedelta
-# import concurrent.futures
-# import threading
+from pprint import pprint
 from prometheus_client import CollectorRegistry, Gauge, push_to_gateway, Counter
 
 import boto3
@@ -15,37 +14,14 @@ import botocore
 import clean_ibm_sandbox
 
 
-def api_call(url, **kwargs):
-    if 'values' in kwargs:
-        values = kwargs['values']
-    else:
-        values = {}
-
-    if 'headers' in kwargs:
-        headers = kwargs['headers']
-    else:
-        headers = {}
-
-    if not values:
-        request = urllib.request.Request(url=url, headers=headers)
-        response = urllib.request.urlopen(request)
-    else:
-        data = urllib.parse.urlencode(values)
-        data = data.encode('ascii')
-        request = urllib.request.Request(url, data, headers)
-        response = urllib.request.urlopen(request)
-
-    return response
-
-
 def get_token(saa_api_key, saa_url):
     url = f"{saa_url}/token"
     values = {
         "api_key": saa_api_key
     }
-    response = api_call(url, values=values)
-    token = json.loads(response.read())
-
+    http = urllib3.PoolManager()
+    response = http.request('POST', url, fields=values)
+    token = json.loads(response.data.decode('utf-8'))
     return token['access_token']
 
 
@@ -59,8 +35,14 @@ def get_accounts(saa_url, saa_token, query_type):
         "Authorization": f"Bearer {saa_token}"
     }
 
-    response = api_call(url, headers=headers)
-    response = json.loads(response.read())
+    http = urllib3.PoolManager()
+    response = http.request(
+        'GET',
+        url,
+        headers=headers
+    )
+
+    response = json.loads(response.data.decode('utf-8'))
 
     return response
 
@@ -92,24 +74,23 @@ def clean_accounts(saa_api_key, saa_url, push_gw_url):
             cloud_provider = account['cloud_provider']['S']
             account_name = account['account_name']['S']
             ibm_api_key = account['master_api_key']['S']
-            labels = {'account': account_name, 'cloud_provider': cloud_provider, 'status': 'failed'}
+            labels = {'account': account_name, 'cloud_provider': cloud_provider}
             logging.info(f"Starting clean of account {account_name}")
             cleaning = clean_ibm_sandbox.clean(ibm_api_key)
             if not cleaning:
+                saa_token = get_token(saa_api_key, saa_url)
+                clean_status = 0
+                update_account(saa_url, saa_token, account_name, cloud_provider, 'cleanup')
                 logging.info(
                     f"No resources found in account {account_name}; marking cleanup timestamp.")
-                clean_status = 0
-                response = update_account(saa_url, saa_token, account_name,
-                                          cloud_provider, 'cleanup')
             else:
                 logging.error(
                     f"Account {account['account_name']} in cloud provider {account['cloud_provider']} could not be fully cleaned.")
                 clean_status = 1
-                response = update_account(saa_url, saa_token, account_name,
-                                          cloud_provider, 'cleanup')
+                # response = update_account(saa_url, saa_token, account_name,
+                                        #   cloud_provider, 'cleanup')
 
             push_to_prometheus(push_gw_url, 'clean_accounts', 'ibm_clean_accounts', 'Resource to be clean by account', clean_status, labels)
-            return response
 
     else:
         logging.info("No accounts need cleanup.")
@@ -132,93 +113,89 @@ def verify_accounts(saa_api_key, saa_url, push_gw_url):
         logging.info("Using local development dynamodb")
 
     saa_token = get_token(saa_api_key, saa_url)
-
     need_verify_accounts = get_accounts(saa_url, saa_token, 'verify')
 
     if need_verify_accounts:
-        logging.info(f"Accounts needing verification: {need_verify_accounts}")
-    else:
-        logging.info("No accounts need usage verification.")
-
-    for account in need_verify_accounts:
-        account_name = account['account_name']['S']
-        cloud_provider = account['cloud_provider']['S']
-        logging.info(f"Starting verification of account {account_name}")
-        cleanup_time = datetime.fromisoformat(account['cleanup_time']['S'])
-        verification_time = cleanup_time + timedelta(hours=3)
-        labels = {'account': account_name, 'cloud_provider': cloud_provider}
-
-        if datetime.now(timezone.utc) >= verification_time:
-            logging.info(f"Evaluating account {account['account_name']['S']}.")
-            previous_usage_time = (datetime.now(timezone.utc) - timedelta(hours=2, minutes=20)).strftime('%Y-%m-%dT%H')
-            logging.info(f"Previous usage timestamp is {previous_usage_time}")
-            previous_usage = db.query(
-                TableName=billing_table,
-                KeyConditionExpression='account_name = :an AND begins_with(#t, :ts)',
-                ExpressionAttributeValues={
-                    ":an": {
-                        "S": account_name
+        logging.info("Accounts needing verification:")
+        logging.info(need_verify_accounts)
+        for account in need_verify_accounts:
+            account_name = account['account_name']['S']
+            cloud_provider = account['cloud_provider']['S']
+            logging.info(f"Starting verification of account {account_name}")
+            cleanup_time = datetime.fromisoformat(account['cleanup_time']['S'])
+            verification_time = cleanup_time + timedelta(hours=3)
+            labels = {'account': account_name, 'cloud_provider': cloud_provider}
+            if datetime.now(timezone.utc) >= verification_time:
+                logging.info(f"Evaluating account {account['account_name']['S']}.")
+                previous_usage_time = (datetime.now(timezone.utc) - timedelta(hours=2, minutes=20)).strftime('%Y-%m-%dT%H')
+                logging.info(f"Previous usage timestamp is {previous_usage_time}")
+                previous_usage = db.query(
+                    TableName=billing_table,
+                    KeyConditionExpression='account_name = :an AND begins_with(#t, :ts)',
+                    ExpressionAttributeValues={
+                        ":an": {
+                            "S": account_name
+                        },
+                        ":ts": {
+                            "S": previous_usage_time
+                        }
                     },
-                    ":ts": {
-                        "S": previous_usage_time
+                    ExpressionAttributeNames={
+                        "#t": "timestamp"
                     }
-                },
-                ExpressionAttributeNames={
-                    "#t": "timestamp"
-                }
-            )
+                )
 
-            logging.info(
-                f"{account_name} previous usage is {previous_usage['Items'][0]['billable_cost']['N']}")
+                logging.info(
+                    f"{account_name} previous usage is {previous_usage['Items'][0]['billable_cost']['N']}")
 
-            current_usage_time = (datetime.now(timezone.utc) - timedelta(minutes=20)).strftime('%Y-%m-%dT%H')
-            logging.info(f"Current usage timestamp is {current_usage_time}")
-            current_usage = db.query(
-                TableName=billing_table,
-                KeyConditionExpression='account_name = :an AND begins_with(#t, :ts)',
-                ExpressionAttributeValues={
-                    ":an": {
-                        "S": account_name
+                current_usage_time = (datetime.now(timezone.utc) - timedelta(minutes=20)).strftime('%Y-%m-%dT%H')
+                logging.info(f"Current usage timestamp is {current_usage_time}")
+                current_usage = db.query(
+                    TableName=billing_table,
+                    KeyConditionExpression='account_name = :an AND begins_with(#t, :ts)',
+                    ExpressionAttributeValues={
+                        ":an": {
+                            "S": account_name
+                        },
+                        ":ts": {
+                            "S": current_usage_time
+                        }
                     },
-                    ":ts": {
-                        "S": current_usage_time
+                    ExpressionAttributeNames={
+                        "#t": "timestamp"
                     }
-                },
-                ExpressionAttributeNames={
-                    "#t": "timestamp"
-                }
-            )
+                )
 
-            logging.info(
-                f"{account_name} current usage is {current_usage['Items'][0]['billable_cost']['N']}")
+                logging.info(
+                    f"{account_name} current usage is {current_usage['Items'][0]['billable_cost']['N']}")
 
-            current_cost = float(
-                current_usage['Items'][0]['billable_cost']['N'])
-            previous_cost = float(
-                previous_usage['Items'][0]['billable_cost']['N'])
+                current_cost = float(
+                    current_usage['Items'][0]['billable_cost']['N'])
+                previous_cost = float(
+                    previous_usage['Items'][0]['billable_cost']['N'])
 
-            push_to_prometheus(push_gw_url, 'verify_accounts', 'ibm_current_usage', 'Current usage by account',
-                               current_cost, labels)
+                push_to_prometheus(push_gw_url, 'verify_accounts', 'ibm_current_usage', 'Current usage by account',
+                                current_cost, labels)
+                push_to_prometheus(push_gw_url, 'verify_accounts', 'ibm_previous_usage', 'Previous usage by account',
+                                previous_cost, labels)
 
-            push_to_prometheus(push_gw_url, 'verify_accounts', 'ibm_previous_usage', 'Previous usage by account',
-                               previous_cost, labels)
+                if current_cost > previous_cost:
+                    logging.warning(
+                        f"The current charges of {current_cost} are greater than the previous charges of {previous_cost} in account {account_name}.")
+                else:
+                    logging.info(
+                        f"No additional charges detected in account {account_name}.")
+                    saa_token = get_token(saa_api_key, saa_url)
+                    update_account(saa_url, saa_token, account_name,
+                                            cloud_provider, 'verify')
+                    logging.info(f"Account {account_name} released.")
 
-            if current_cost > previous_cost:
-                logging.warning(
-                    f"The current charges of {current_cost} are greater than the previous charges of {previous_cost} in account {account_name}.")
             else:
                 logging.info(
-                    f"No additional charges detected in account {account_name}.")
-                response = update_account(saa_url, saa_token, account_name,
-                                          cloud_provider, 'verify')
-                logging.info(f"Account {account_name} released.")
+                    f"Account {account['account_name']['S']} is not ready to be verified.")
 
-                return response
-
-        else:
-            logging.info(
-                f"Account {account['account_name']['S']} is not ready to be verified.")
-
+    else:
+        logging.info("No accounts need usage verification.")
 
 def update_account(saa_url, saa_token, account_name, cloud_provider, update_type):
     if update_type == 'cleanup':
@@ -234,8 +211,14 @@ def update_account(saa_url, saa_token, account_name, cloud_provider, update_type
         "cloud_provider": cloud_provider
     }
 
-    response = api_call(url, headers=headers, values=values)
-    response = json.loads(response.read())
+    http = urllib3.PoolManager()
+    response = http.request(
+        'POST',
+        url,
+        headers=headers,
+        fields=values
+    )
+    response = json.loads(response.data.decode('utf-8'))
     return response
 
 
