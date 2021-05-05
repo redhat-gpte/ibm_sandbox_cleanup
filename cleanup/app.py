@@ -144,8 +144,14 @@ def verify_accounts(saa_api_key, saa_url, push_gw_url):
                     }
                 )
 
-                logging.info(
-                    f"{account_name} previous usage is {previous_usage['Items'][0]['billable_cost']['N']}")
+                if previous_usage['Items']:
+                    logging.info(
+                        f"{account_name} previous usage is {previous_usage['Items'][0]['billable_cost']['N']}")
+                else:
+                    logging.error(
+                        f"There is no previous usage data for {account_name}"
+                    )
+                    return
 
                 current_usage_time = (datetime.now(timezone.utc) - timedelta(minutes=20)).strftime('%Y-%m-%dT%H')
                 logging.info(f"Current usage timestamp is {current_usage_time}")
@@ -165,8 +171,14 @@ def verify_accounts(saa_api_key, saa_url, push_gw_url):
                     }
                 )
 
-                logging.info(
-                    f"{account_name} current usage is {current_usage['Items'][0]['billable_cost']['N']}")
+                if current_usage['Items']:
+                    logging.info(
+                        f"{account_name} current usage is {current_usage['Items'][0]['billable_cost']['N']}")
+                else:
+                    logging.error(
+                        f"There is no current usage data for {account_name}"
+                    )
+                    return
 
                 current_cost = float(
                     current_usage['Items'][0]['billable_cost']['N'])
