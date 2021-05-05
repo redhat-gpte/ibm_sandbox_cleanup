@@ -645,15 +645,19 @@ def delete_vpcs(service):
 
 
 def get_all_resources(resource_controller, resource_groups):
+    resource_list = []
     for rg in resource_groups:
         resources = resource_controller.list_resource_instances(
             resource_group_id=rg).get_result()['resources']
-        for resource in resources:
-            logging.warning(
-                f"Resource group {rg} still has resources: {resource['resource_id']}: {resource['id']}")
+        if resources:
+            for resource in resources:
+                logging.warning(
+                    f"Resource group {rg} still has resources: {resource['resource_id']}: {resource['id']}")
+                resource_list.append(resource)
         else:
             logging.info(f"No resources in resource group {rg}")
-    return resources
+    response = [i for i in resource_list if ('security-advisor' not in i['id'])]
+    return response
 
 
 def clean(api_key=None):
