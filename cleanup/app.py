@@ -86,8 +86,6 @@ def clean_accounts(saa_api_key, saa_url, push_gw_url):
                 logging.error(
                     f"Account {account['account_name']} in cloud provider {account['cloud_provider']} could not be fully cleaned.")
                 clean_status = 1
-                # response = update_account(saa_url, saa_token, account_name,
-                                        #   cloud_provider, 'cleanup')
 
             push_to_prometheus(push_gw_url, 'clean_accounts', 'ibm_clean_accounts', 'Resource to be clean by account', clean_status, labels)
 
