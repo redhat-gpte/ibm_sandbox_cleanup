@@ -5,7 +5,6 @@ import argparse
 import json
 import logging
 from datetime import datetime, timezone, timedelta
-from pprint import pprint
 from prometheus_client import CollectorRegistry, Gauge, push_to_gateway, Counter
 
 import boto3
