@@ -1,18 +1,16 @@
-from ibm_cloud_sdk_core.authenticators import IAMAuthenticator
-from ibm_cloud_sdk_core import ApiException
-from ibm_vpc import VpcV1
-from ibm_platform_services.resource_manager_v2 import ResourceManagerV2
-from ibm_platform_services.resource_controller_v2 import ResourceControllerV2
-# import ibm_boto3
-# from ibm_botocore.client import Config, ClientError
 import argparse
 from time import sleep
 import logging
 import sys
 import urllib3
 import json
-from pprint import pprint
 from urllib.parse import urlencode
+
+from ibm_cloud_sdk_core.authenticators import IAMAuthenticator
+from ibm_cloud_sdk_core import ApiException
+from ibm_vpc import VpcV1
+from ibm_platform_services.resource_manager_v2 import ResourceManagerV2
+from ibm_platform_services.resource_controller_v2 import ResourceControllerV2
 
 
 def get_token(api_key):
