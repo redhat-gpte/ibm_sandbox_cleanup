@@ -694,7 +694,6 @@ def get_security_groups(service):
 
 def delete_security_groups(service):
     security_groups = get_security_groups(service)
-    pprint(security_groups)
     for sg in security_groups:
         try:
             logging.info(
@@ -863,7 +862,7 @@ def clean(api_key=None):
         delete_security_groups(service)
 
     logging.info("Sleeping for 60s to let resource controller catch up.")
-    sleep(10)
+    sleep(60)
 
     resource_controller = ResourceControllerV2(authenticator=authenticator)
     resource_list = get_all_resources(resource_controller, resource_groups)
