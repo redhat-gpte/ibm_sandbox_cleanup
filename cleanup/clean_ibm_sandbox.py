@@ -3,8 +3,8 @@ from time import sleep
 import logging
 import sys
 import urllib3
-import json
 from urllib.parse import urlencode
+import json
 
 from ibm_cloud_sdk_core.authenticators import IAMAuthenticator
 from ibm_cloud_sdk_core import ApiException
@@ -763,7 +763,8 @@ def delete_rhoic_clusters(api_key):
             rhoic_cluster_deleted = True
 
     if rhoic_cluster_deleted:
-        logging.info(f"Sleeping for 10 minutes to wait for RHOIC clusters to delete")
+        logging.info(
+            f"Sleeping for 10 minutes to wait for RHOIC clusters to delete")
         sleep(600)
 
     remaining_rhoic_clusters = get_rhoic_clusters(api_key)
