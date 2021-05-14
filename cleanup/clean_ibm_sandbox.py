@@ -1,13 +1,28 @@
+import argparse
+from time import sleep
+import logging
+import sys
+import urllib3
+from urllib.parse import urlencode
+import json
+
 from ibm_cloud_sdk_core.authenticators import IAMAuthenticator
 from ibm_cloud_sdk_core import ApiException
 from ibm_vpc import VpcV1
 from ibm_platform_services.resource_manager_v2 import ResourceManagerV2
 from ibm_platform_services.resource_controller_v2 import ResourceControllerV2
-import argparse
-from time import sleep
-import logging
-import sys
-import pprint
+
+
+def get_token(api_key):
+    url = "https://iam.cloud.ibm.com/identity/token?"
+    values = {'grant_type': 'urn:ibm:params:oauth:grant-type:apikey',
+              'apikey': api_key}
+    encoded_args = urlencode(values)
+    url = url + encoded_args
+    http = urllib3.PoolManager()
+    response = http.request('POST', url)
+    token = json.loads(response.data.decode('utf-8'))
+    return token['access_token']
 
 
 def get_resource_groups(resource_manager):
@@ -63,9 +78,6 @@ def delete_instance_groups(service):
             # Delete the instance group
             logging.info(
                 f"Deleting instance group {ig['id']} in VPC {ig['vpc']['id']} in resource group {ig['resource_group']['id']}")
-            # logging.info("Deleting instance group " + ig['id'] + " in:")
-            # logging.info("VPC: " + ig['vpc']['id'])
-            # logging.info("Resource Group: " + ig['resource_group']['id'])
             service.delete_instance_group(ig['id'])
         except ApiException as e:
             logging.error(
@@ -95,9 +107,6 @@ def delete_instance_templates(service):
         try:
             logging.info(
                 f"Deleting instance template {it['id']} in VPC: {it['vpc']['id']} in resource group {it['resource_group']['id']}")
-            # logging.info("Deleting instance template " + it['id'] + " in:")
-            # logging.info("VPC: " + it['vpc']['id'])
-            # logging.info("Resource Group: " + it['resource_group']['id'])
             service.delete_instance_template(it['id'])
         except ApiException as e:
             logging.error(
@@ -271,25 +280,55 @@ def delete_keys(service):
         logging.info("All keys deleted successfully.")
 
 
-def get_images(service, resource_groups):
+def get_images(service, resource_group):
+    images = service.list_images(
+        limit=100, resource_group_id=resource_group).get_result()['images']
+    if images:
+        image_list = []
+        for image in images:
+            image_list.append(image['id'])
+        return image_list
+
+
+def delete_images(service, resource_groups):
     for resource_group in resource_groups:
-        images = service.list_images(
-            limit=100, resource_group_id=resource_group).get_result()['images']
+        images = get_images(service, resource_group)
         if images:
-            image_list = []
             for image in images:
-                image_list.append(image['id'])
-            logging.warning(
-                f"The following images exist in resource group {resource_group}: {image_list}")
+                try:
+                    logging.info(
+                        f"Deleting the following image in resource group {resource_group}: {image}"
+                    )
+                    service.delete_image(image)
+                except ApiException as e:
+                    logging.error(
+                        f"Delete image failed with code {e.code}: {e.message}"
+                    )
+
+        if images:
+            sleep(30)
+
+        remaining_images = get_images(service, resource_group)
+        attempt = 0
+        while attempt <= 5 and remaining_images:
+            for image in remaining_images:
+                try:
+                    logging.warning(
+                        f"Retrying delete of image {image['id']} for attempt {attempt}.")
+                    service.delete_image(image)
+                except ApiException as e:
+                    logging.error(
+                        f"Delete key failed with code {e.code}: {e.message}")
+            attempt += 1
+            sleep(15)
+            remaining_images = get_images(service, resource_group)
+
+        if remaining_images:
+            for image in remaining_images:
+                logging.error(
+                    f"Key {image['id']} could not be deleted. Investigate.")
         else:
-            logging.info(
-                f"No images to delete in resource group {resource_group}.")
-
-
-def delete_images(service):
-    # TODO: Once COS is enabled and people can create private
-    # images, this will need to be implemented.
-    pass
+            logging.info("All images deleted successfully.")
 
 
 def get_public_gateways(service):
@@ -644,6 +683,128 @@ def delete_vpcs(service):
         logging.info("All VPCs deleted successfully.")
 
 
+def get_security_groups(service):
+    security_groups = service.list_security_groups().get_result()[
+        'security_groups']
+    response = []
+    for sg in security_groups:
+        response.append(sg)
+    return response
+
+
+def delete_security_groups(service):
+    security_groups = get_security_groups(service)
+    for sg in security_groups:
+        try:
+            logging.info(
+                f"Deleting security group {sg['id']} in resource group: {sg['resource_group']['id']}")
+            service.delete_security_group(sg['id'])
+        except ApiException as e:
+            logging.error(
+                f"Delete security group failed with code {e.code}: {e.message}")
+
+    if security_groups:
+        sleep(15)
+
+    remaining_security_groups = get_security_groups(service)
+    attempt = 0
+    while attempt <= 5 and remaining_security_groups:
+        for sg in remaining_security_groups:
+            try:
+                logging.warning(
+                    f"Retrying delete of security group {sg['id']} for attempt {attempt}.")
+                service.delete_security_group(sg['id'])
+            except ApiException as e:
+                logging.error(
+                    f"Delete security group failed with code {e.code}: {e.message}")
+        attempt += 1
+        sleep(15)
+        remaining_security_groups = get_security_groups(service)
+
+    if remaining_security_groups:
+        for sg in remaining_security_groups:
+            logging.error(
+                f"Security group {sg['id']} could not be deleted. Investigate.")
+    else:
+        logging.info("All security groups deleted successfully.")
+
+
+def get_rhoic_clusters(api_key):
+    token = get_token(api_key)
+    http = urllib3.PoolManager()
+    url = "https://containers.cloud.ibm.com/global/v2/vpc/getClusters"
+    headers = {"Authorization": "Bearer " + token}
+    logging.info("Getting the list of RHOIC clusters")
+    rhoic_clusters = http.request(
+        'GET',
+        url,
+        headers=headers
+    ).data.decode('utf-8')
+    rhoic_clusters = json.loads(rhoic_clusters)
+
+    return rhoic_clusters
+
+
+def delete_rhoic_clusters(api_key):
+    rhoic_clusters = get_rhoic_clusters(api_key)
+    rhoic_cluster_deleted = False
+    for cluster in rhoic_clusters:
+        if cluster['state'] != 'deleting':
+            token = get_token(api_key)
+            http = urllib3.PoolManager()
+            url = f"https://containers.cloud.ibm.com/global/v1/clusters/{cluster['id']}?deleteResources=True"
+            headers = {"Authorization": "Bearer " + token}
+            logging.info(f"Deleting the RHOIC cluster {cluster['id']}")
+            http.request(
+                'DELETE',
+                url,
+                headers=headers
+            )
+            rhoic_cluster_deleted = True
+
+    if rhoic_cluster_deleted:
+        logging.info(
+            f"Sleeping for 10 minutes to wait for RHOIC clusters to delete")
+        sleep(600)
+
+    remaining_rhoic_clusters = get_rhoic_clusters(api_key)
+    attempt = 0
+    while attempt <= 5 and remaining_rhoic_clusters:
+        logging.info(
+            f"Pausing 60 seconds for RHOIC cleanup attempt #{attempt}")
+        sleep(60)
+        attempt += 1
+        remaining_rhoic_clusters = get_rhoic_clusters(api_key)
+
+    if remaining_rhoic_clusters:
+        logging.error(f"RHOIC clusters could not be cleaned up")
+    else:
+        logging.info("No RHOIC clusters found.")
+
+
+def delete_cos_instance(resource_controller, resource):
+    try:
+        logging.info(f"Deleting COS instance {resource}")
+        resource_controller.delete_resource_instance(resource, recursive=True)
+    except ApiException as e:
+        logging.error(
+            f"Delete resource instance failed with code {e.code}: {e.message}")
+
+    logging.info("Pausing 20s for COS instances to delete")
+    sleep(20)
+
+    cos_instance = resource_controller.get_resource_instance(
+        resource).get_result()
+
+    if cos_instance['state'] != 'removed':
+        logging.warning(
+            f"COS instance {cos_instance['crn']} may not be deleted. Investigate"
+        )
+    else:
+        logging.info(
+            f"COS instance {cos_instance['crn']} deleted successfully.")
+
+
 def get_all_resources(resource_controller, resource_groups):
     resource_list = []
     for rg in resource_groups:
@@ -656,15 +817,14 @@ def get_all_resources(resource_controller, resource_groups):
                 resource_list.append(resource)
         else:
             logging.info(f"No resources in resource group {rg}")
-    response = [i for i in resource_list if ('security-advisor' not in i['id'])]
+    # The security advisor resources cannot be deleted, so we
+    # will exclude them from the list
+    response = [i for i in resource_list if (
+        'security-advisor' not in i['id'])]
     return response
 
 
 def clean(api_key=None):
-    # logging.getLogger(__name__)
-    # logging.basicConfig(stream=sys.stdout, level=logging.INFO, format='%(asctime)s %(module)s %(levelname)s %(message)s', datefmt='%Y-%m-%dT%H:%M:%S%z')
-    # This will be removed and should be provided in an arg
-    # or as an env var
     if api_key is None:
         logging.error("API key must be provided.")
         return None
@@ -673,6 +833,10 @@ def clean(api_key=None):
 
     resource_manager = ResourceManagerV2(authenticator=authenticator)
     resource_groups = get_resource_groups(resource_manager)
+
+    # RHOIC is global, so this is being deleted before looping
+    # through the regions
+    delete_rhoic_clusters(api_key)
 
     service = VpcV1(version='2020-11-17',
                     authenticator=authenticator, generation=2)
@@ -689,7 +853,7 @@ def clean(api_key=None):
         delete_instances(service)
         delete_volumes(service)
         delete_keys(service)
-        get_images(service, resource_groups)
+        delete_images(service, resource_groups)
         delete_vpn_gateways(service)
         delete_load_balancers(service)
         delete_endpoint_gateways(service)
@@ -698,14 +862,21 @@ def clean(api_key=None):
         delete_public_gateways(service)
         delete_floating_ips(service)
         delete_vpcs(service)
+        delete_security_groups(service)
 
     logging.info("Sleeping for 60s to let resource controller catch up.")
     sleep(60)
 
     resource_controller = ResourceControllerV2(authenticator=authenticator)
-    resources = get_all_resources(resource_controller, resource_groups)
+    resource_list = get_all_resources(resource_controller, resource_groups)
 
-    return resources
+    logging.info("Processing cloud object storage instances")
+    for resource in resource_list:
+        if 'cloud-object-storage' in resource['crn']:
+            delete_cos_instance(resource_controller, resource['crn'])
+
+    resource_list = get_all_resources(resource_controller, resource_groups)
+    return resource_list
 
 
 if __name__ == "__main__":
