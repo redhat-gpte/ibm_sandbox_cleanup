@@ -817,6 +817,8 @@ def get_all_resources(resource_controller, resource_groups):
                 resource_list.append(resource)
         else:
             logging.info(f"No resources in resource group {rg}")
+    # The security advisor resources cannot be deleted, so we
+    # will exclude them from the list
     response = [i for i in resource_list if (
         'security-advisor' not in i['id'])]
     return response
