@@ -820,7 +820,7 @@ def get_all_resources(resource_controller, resource_groups):
     # The security advisor resources cannot be deleted, so we
     # will exclude them from the list
     ignore_resource = ['security-advisor', 'schematics']
-    response = [res for res in resource_list if any(
+    response = [res for res in resource_list if not any(
         ig in res for ig in ignore_resource)]
     return response
 
