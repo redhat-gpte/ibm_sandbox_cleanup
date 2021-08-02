@@ -5,6 +5,7 @@ import sys
 import urllib3
 from urllib.parse import urlencode
 import json
+from pprint import pprint
 
 from ibm_cloud_sdk_core.authenticators import IAMAuthenticator
 from ibm_cloud_sdk_core import ApiException
@@ -820,7 +821,9 @@ def get_all_resources(resource_controller, resource_groups):
     # The security advisor resources cannot be deleted, so we
     # will exclude them from the list
     response = [i for i in resource_list if (
-        'security-advisor' not in i['id'] and 'schematics' not in i['id'])]
+        'security-advisor' not in i['id'])]
+        # 'security-advisor' not in i['id'] and 'schematics' not in i['id'])]
+    pprint(response)
     return response
 
 
@@ -848,24 +851,24 @@ def clean(api_key=None):
         base_url = region['endpoint'] + '/v1'
         service.set_service_url(base_url)
         logging.info("Processing region: " + region['endpoint'])
-        delete_instance_groups(service)
-        delete_instance_templates(service)
-        delete_instances(service)
-        delete_volumes(service)
-        delete_keys(service)
-        delete_images(service, resource_groups)
-        delete_vpn_gateways(service)
-        delete_load_balancers(service)
-        delete_endpoint_gateways(service)
-        get_flow_log_collectors(service)
-        delete_subnets(service)
-        delete_public_gateways(service)
-        delete_floating_ips(service)
-        delete_vpcs(service)
-        delete_security_groups(service)
+        # delete_instance_groups(service)
+        # delete_instance_templates(service)
+        # delete_instances(service)
+        # delete_volumes(service)
+        # delete_keys(service)
+        # delete_images(service, resource_groups)
+        # delete_vpn_gateways(service)
+        # delete_load_balancers(service)
+        # delete_endpoint_gateways(service)
+        # get_flow_log_collectors(service)
+        # delete_subnets(service)
+        # delete_public_gateways(service)
+        # delete_floating_ips(service)
+        # delete_vpcs(service)
+        # delete_security_groups(service)
 
     logging.info("Sleeping for 60s to let resource controller catch up.")
-    sleep(60)
+    sleep(10)
 
     resource_controller = ResourceControllerV2(authenticator=authenticator)
     resource_list = get_all_resources(resource_controller, resource_groups)
