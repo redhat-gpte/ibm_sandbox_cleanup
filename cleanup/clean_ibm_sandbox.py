@@ -820,7 +820,7 @@ def get_all_resources(resource_controller, resource_groups):
     # The security advisor resources cannot be deleted, so we
     # will exclude them from the list
     response = [i for i in resource_list if (
-        'security-advisor' not in i['id'])]
+        'security-advisor' not in i['id'] and 'schematics' not in i['id'])]
     return response
 
 
