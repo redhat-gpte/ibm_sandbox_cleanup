@@ -819,8 +819,9 @@ def get_all_resources(resource_controller, resource_groups):
             logging.info(f"No resources in resource group {rg}")
     # The security advisor resources cannot be deleted, so we
     # will exclude them from the list
-    response = [i for i in resource_list if (
-        'security-advisor' not in i['id'])]
+    ignore_resource = ['security-advisor', 'schematics']
+    response = [res for res in resource_list if not any(
+        ig in res for ig in ignore_resource)]
     return response
 
 
