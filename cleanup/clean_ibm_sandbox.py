@@ -479,6 +479,9 @@ def get_load_balancers(service):
     load_balancers = service.list_load_balancers(
         limit=100).get_result()['load_balancers']
     response = []
+    if not load_balancers:
+        return []
+
     for load_balancer in load_balancers:
         response.append(load_balancer)
     return response
@@ -830,7 +833,6 @@ def clean(api_key=None):
         return None
 
     authenticator = IAMAuthenticator(api_key)
-
     resource_manager = ResourceManagerV2(authenticator=authenticator)
     resource_groups = get_resource_groups(resource_manager)
 
