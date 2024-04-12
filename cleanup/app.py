@@ -131,7 +131,7 @@ def verify_accounts(saa_api_key, saa_url, push_gw_url, account_to_verify=None):
             cloud_provider = account['cloud_provider']['S']
             logging.info(f"Starting verification of account {account_name}")
             cleanup_time = datetime.fromisoformat(account['cleanup_time']['S'])
-            verification_time = cleanup_time
+            verification_time = cleanup_time + timedelta(hours=24)
             labels = {'account': account_name, 'cloud_provider': cloud_provider}
             if datetime.now(timezone.utc) >= verification_time:
                 logging.info(f"Evaluating account {account['account_name']['S']}.")
