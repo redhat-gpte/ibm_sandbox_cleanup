@@ -1,11 +1,16 @@
+{{- if .Values.deploy }}
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: {{ include "ibm-sandbox-cleanup.fullname" . }}
+  name: {{ include "ibm-sandbox-cleanup.name" . }}
   labels:
     {{- include "ibm-sandbox-cleanup.labels" . | nindent 4 }}
 spec:
   schedule: "*/30 * * * *"
+  concurrencyPolicy: "Forbid"
+  suspend: {{ .Values.suspendCronJob }}
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
   jobTemplate:
     spec:
       template:
@@ -21,12 +26,12 @@ spec:
               valueFrom:
                 secretKeyRef:
                   key: aws_secret_access_key
-                  name: {{ include "ibm-sandbox-cleanup.fullname" . }}-dynamodb
+                  name: {{ include "ibm-sandbox-cleanup.name" . }}-dynamodb
             - name: AWS_REGION
               valueFrom:
                 secretKeyRef:
                   key: aws_region
-                  name: {{ include "ibm-sandbox-cleanup.fullname" . }}-dynamodb
+                  name: {{ include "ibm-sandbox-cleanup.name" . }}-dynamodb
             - name: SAA_URL
               value: "{{ .Values.sandboxAssignmentAPI.url }}"
             - name: IBM_USAGE_DB
@@ -35,10 +40,11 @@ spec:
               valueFrom:
                 secretKeyRef:
                   key: api_key
-                  name: {{ include "ibm-sandbox-cleanup.fullname" . }}-saa-credential
+                  name: {{ include "ibm-sandbox-cleanup.name" . }}-saa-credential
             - name: PUSH_GATEWAY_URL
               value: "{{ .Values.pushGateway }}"
             image: "{{ .Values.image.repository }}:v{{ .Values.image.tag | default .Chart.AppVersion }}"
             imagePullPolicy: IfNotPresent
             name: cleanup
           restartPolicy: Never
+{{- end }}

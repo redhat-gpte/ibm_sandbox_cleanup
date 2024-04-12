@@ -52,6 +52,6 @@ Selector labels
 {{- define "ibm-sandbox-cleanup.selectorLabels" -}}
 app.kubernetes.io/name: {{ include "ibm-sandbox-cleanup.name" . }}
 {{- if (ne .Release.Name "RELEASE-NAME") }}
-app.kubernetes.io/instance: {{ .Release.Name }}
+app.kubernetes.io/instance: {{ include "ibm-sandbox-cleanup.name" . }}
 {{- end -}}
 {{- end }}
