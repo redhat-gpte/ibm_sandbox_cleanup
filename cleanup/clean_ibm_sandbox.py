@@ -376,7 +376,7 @@ def delete_public_gateways(service):
             logging.error(
                 f"Public gateway {public_gateway['id']} could not be deleted. Investigate.")
     else:
-        logging.info(f"All public gateways deleted successfully.")
+        logging.info("All public gateways deleted successfully.")
 
 
 def get_floating_ips(service):
@@ -529,12 +529,15 @@ def delete_load_balancers(service):
 
 
 def get_endpoint_gateways(service):
-    endpoint_gateways = service.list_endpoint_gateways(
-        limit=100).get_result()['endpoint_gateways']
-    response = []
-    for endpoint_gateway in endpoint_gateways:
-        response.append(endpoint_gateway)
-    return response
+    try:
+        endpoint_gateways = service.list_endpoint_gateways(
+            limit=100).get_result()['endpoint_gateways']
+        response = []
+        for endpoint_gateway in endpoint_gateways:
+            response.append(endpoint_gateway)
+        return response
+    except Exception as e:
+        logging.error(f"Get endpoint gateways failed with {e}", stack_info=True)
 
 
 def delete_endpoint_gateways(service):
@@ -548,7 +551,7 @@ def delete_endpoint_gateways(service):
             logging.error(
                 f"Delete endpoint gateway failed with code {e.code}: {e.message}")
 
-    if endpoint_gateways:
+    if len(endpoint_gateways) > 0:
         sleep(30)
 
     remaining_endpoint_gateways = get_endpoint_gateways(service)
@@ -577,14 +580,29 @@ def delete_endpoint_gateways(service):
 
 
 def get_flow_log_collectors(service):
-    flow_log_collectors = service.list_flow_log_collectors(limit=100).get_result()[
-        'flow_log_collectors']
-    if flow_log_collectors:
-        logging.warning(f"The following flow log collectors exist:")
-        for flc in flow_log_collectors:
-            logging.warning(flc['id'])
-    else:
-        logging.info("No flow log collectors to delete.")
+    """
+    As of 28 March 2024, the IBM Log Analysis and IBM Cloud Activity Tracker services
+    are deprecated and will no longer be supported as of 30 March 2025.
+    Customers will need to migrate to IBM Cloud Logs, which replaces these two services,
+    prior to 30 March 2025.
+    """
+
+    try:
+        flow_log_collectors = service.list_flow_log_collectors(limit=100).get_result()[
+            'flow_log_collectors']
+
+        if flow_log_collectors:
+            logging.warning("The following flow log collectors exist:")
+            for flc in flow_log_collectors:
+                logging.warning(flc['id'])
+        else:
+            logging.info("No flow log collectors to delete.")
+
+    except ApiException as e:
+        if e.code == 502:
+            return []
+
+        logging.error(f"Get flow log collectors failed with {e.code}", stack_info=True)
 
 
 def delete_flow_log_collectors(service):
@@ -594,11 +612,18 @@ def delete_flow_log_collectors(service):
 
 
 def get_subnets(service):
-    subnets = service.list_subnets().get_result()['subnets']
-    response = []
-    for subnet in subnets:
-        response.append(subnet)
-    return response
+    try:
+        subnets = service.list_subnets().get_result()['subnets']
+        response = []
+        for subnet in subnets:
+            response.append(subnet)
+        return response
+    except ApiException as e:
+        if e.code == 502:
+            return []
+
+        logging.error(f"Get subnets failed with {e.code}", stack_info=True)
+        return []
 
 
 def delete_subnets(service):
@@ -840,16 +865,17 @@ def clean(api_key=None):
     # through the regions
     delete_rhoic_clusters(api_key)
 
-    service = VpcV1(version='2020-11-17',
-                    authenticator=authenticator, generation=2)
+    service = VpcV1(authenticator=authenticator, generation=2)
 
     regions = service.list_regions().get_result()['regions']
     for region in regions:
-        # This region is causing a user whitelist error
-        # if region['name'] != 'jp-osa':
+        # This region is causing a error 502
+        if region['name'] == 'ca-tor':
+            continue
+
         base_url = region['endpoint'] + '/v1'
         service.set_service_url(base_url)
-        logging.info("Processing region: " + region['endpoint'])
+        logging.info(f"Processing region: {region['endpoint']}")
         delete_instance_groups(service)
         delete_instance_templates(service)
         delete_instances(service)

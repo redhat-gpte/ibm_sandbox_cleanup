@@ -57,13 +57,13 @@ def push_to_prometheus(push_gw_url, job_name, metric_name, description, value, l
     g = Gauge(metric_name, description, labels_names, registry=registry)
     g.labels(*labels_values).set(value)
     try:
-        logging.info(f"Pushing metrics to prometheus{push_gw_url}")
+        logging.info(f"Pushing metrics to prometheus {push_gw_url}")
         push_to_gateway(push_gw_url, job=job_name, registry=registry)
     except Exception as e:
         logging.error(f"Error sending metrics to pushgateway {push_gw_url} with error {e}")
 
 
-def clean_accounts(saa_api_key, saa_url, push_gw_url):
+def clean_accounts(saa_api_key, saa_url, push_gw_url, account_to_clean=None):
     saa_token = get_token(saa_api_key, saa_url)
     need_clean_accounts = get_accounts(saa_url, saa_token, 'cleanup')
     if need_clean_accounts:
@@ -72,6 +72,10 @@ def clean_accounts(saa_api_key, saa_url, push_gw_url):
         for account in need_clean_accounts:
             cloud_provider = account['cloud_provider']['S']
             account_name = account['account_name']['S']
+
+            if account_name and account_name != account_to_clean:
+                continue
+
             ibm_api_key = account['master_api_key']['S']
             labels = {'account': account_name, 'cloud_provider': cloud_provider}
             logging.info(f"Starting clean of account {account_name}")
@@ -94,16 +98,14 @@ def clean_accounts(saa_api_key, saa_url, push_gw_url):
         return
 
 
-def verify_accounts(saa_api_key, saa_url, push_gw_url):
+def verify_accounts(saa_api_key, saa_url, push_gw_url, account_to_verify=None):
     billing_table = os.environ.get('IBM_USAGE_DB')
     aws_access_key_id = os.environ.get('AWS_ACCESS_KEY_ID')
     aws_secret_access_key = os.environ.get('AWS_SECRET_ACCESS_KEY')
     aws_region = os.environ.get('AWS_REGION')
 
     if aws_access_key_id and aws_secret_access_key and aws_region:
-        prod = boto3.session.Session(aws_access_key_id=aws_access_key_id,
-                                     aws_secret_access_key=aws_secret_access_key, region_name=aws_region)
-        db = prod.client('dynamodb')
+        db = boto3.client('dynamodb', region_name=aws_region)
         logging.info("Using production dynamodb.")
     else:
         db = boto3.client('dynamodb', endpoint_url='http://localhost:8000')
@@ -117,15 +119,20 @@ def verify_accounts(saa_api_key, saa_url, push_gw_url):
         logging.info(need_verify_accounts)
         for account in need_verify_accounts:
             account_name = account['account_name']['S']
+
+            if account_to_verify and account_name != account_to_verify:
+                continue
+
             cloud_provider = account['cloud_provider']['S']
             logging.info(f"Starting verification of account {account_name}")
             cleanup_time = datetime.fromisoformat(account['cleanup_time']['S'])
-            verification_time = cleanup_time + timedelta(hours=24)
+            verification_time = cleanup_time
             labels = {'account': account_name, 'cloud_provider': cloud_provider}
             if datetime.now(timezone.utc) >= verification_time:
                 logging.info(f"Evaluating account {account['account_name']['S']}.")
-                previous_usage_time = (datetime.now(timezone.utc) - timedelta(hours=2, minutes=20)).strftime('%Y-%m-%dT%H')
+                previous_usage_time = (datetime.now(timezone.utc) - timedelta(hours=1, minutes=20)).strftime('%Y-%m-%dT%H:%M')
                 logging.info(f"Previous usage timestamp is {previous_usage_time}")
+                db = boto3.client('dynamodb', region_name=aws_region)
                 previous_usage = db.query(
                     TableName=billing_table,
                     KeyConditionExpression='account_name = :an AND begins_with(#t, :ts)',
@@ -206,6 +213,7 @@ def verify_accounts(saa_api_key, saa_url, push_gw_url):
     else:
         logging.info("No accounts need usage verification.")
 
+
 def update_account(saa_url, saa_token, account_name, cloud_provider, update_type):
     if update_type == 'cleanup':
         url = f"{saa_url}/sandbox/cleanup"
@@ -231,7 +239,7 @@ def update_account(saa_url, saa_token, account_name, cloud_provider, update_type
     return response
 
 
-def main(api_key=None):
+def main(api_key=None, account=None):
     if api_key is None:
         saa_api_key = os.environ.get('SAA_API_KEY')
     elif api_key:
@@ -247,9 +255,9 @@ def main(api_key=None):
     if push_gw_url is None:
         logging.error("Push Gateway asssignment PUSH_GATEWAY_URL must be set as env variable")
 
-    clean_accounts(saa_api_key, saa_url, push_gw_url)
+    clean_accounts(saa_api_key, saa_url, push_gw_url, account_to_clean=account)
 
-    verify_accounts(saa_api_key, saa_url, push_gw_url)
+    verify_accounts(saa_api_key, saa_url, push_gw_url, account_to_verify=account)
 
 
 if __name__ == "__main__":
@@ -260,6 +268,8 @@ if __name__ == "__main__":
         "Get billing data from cloud provider")
     parser.add_argument("--api-key", required=False,
                         help="The API key to the account assignment API.")
+    parser.add_argument("--account", required=False,
+                        help="The account to verifty or clean up.")
     args = parser.parse_args()
 
-    main(api_key=args.api_key)
+    main(api_key=args.api_key, account=args.account)
