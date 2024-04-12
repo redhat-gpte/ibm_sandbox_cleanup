@@ -105,7 +105,12 @@ def verify_accounts(saa_api_key, saa_url, push_gw_url, account_to_verify=None):
     aws_region = os.environ.get('AWS_REGION')
 
     if aws_access_key_id and aws_secret_access_key and aws_region:
-        db = boto3.client('dynamodb', region_name=aws_region)
+        aws_session = boto3.Session(
+            aws_access_key_id=aws_access_key_id,
+            aws_secret_access_key=aws_secret_access_key,
+            region_name=aws_region
+            )
+        db = aws_session.client('dynamodb')
         logging.info("Using production dynamodb.")
     else:
         db = boto3.client('dynamodb', endpoint_url='http://localhost:8000')
@@ -132,7 +137,6 @@ def verify_accounts(saa_api_key, saa_url, push_gw_url, account_to_verify=None):
                 logging.info(f"Evaluating account {account['account_name']['S']}.")
                 previous_usage_time = (datetime.now(timezone.utc) - timedelta(hours=1, minutes=20)).strftime('%Y-%m-%dT%H:%M')
                 logging.info(f"Previous usage timestamp is {previous_usage_time}")
-                db = boto3.client('dynamodb', region_name=aws_region)
                 previous_usage = db.query(
                     TableName=billing_table,
                     KeyConditionExpression='account_name = :an AND begins_with(#t, :ts)',
