@@ -4,7 +4,7 @@
 
 deploy: true
 
-suspendCronJob: true
+suspendCronJob: false
 
 nameOverride: ""
 fullnameOverride: ""
