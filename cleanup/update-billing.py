@@ -6,6 +6,7 @@ from ibm_platform_services.enterprise_usage_reports_v1 import EnterpriseUsageRep
 from ibm_platform_services.enterprise_management_v1 import EnterpriseManagementV1
 import boto3
 
+from metrics import UpdateBillingMetrics
 
 logger = logging.getLogger()
 
@@ -19,6 +20,7 @@ def get_account_group_billing(usage_reporter, account_groups, billing_month):
         print()
 
 
+@UpdateBillingMetrics.record_request_latency
 def create_record(db, billing_table, billing_ttl, **kwargs):
     response = db.put_item(
         TableName=billing_table,
@@ -98,6 +100,9 @@ def main():
                                                          ).get_result()['reports']
         for account in usage:
             logger.info(f"Updating billing for account {account['entity_name']}")
+
+            UpdateBillingMetrics.push_billing_account_total()
+
             response = create_record(db,
                                      billing_table,
                                      billing_ttl,
@@ -108,6 +113,7 @@ def main():
                                      cloud_provider=cloud_provider
                                      )
             if response['ResponseMetadata']['HTTPStatusCode'] == 200:
+                UpdateBillingMetrics.push_billing_account_success(account['entity_name'])
                 print(
                     f"Account {account['entity_name']} updated successfully.")
             else:
@@ -115,7 +121,10 @@ def main():
                     f"Account {account['entity_name']} could not be updated.")
                 print(
                     f"Account {account['entity_name']} could not be updated.")
+                UpdateBillingMetrics.push_billing_account_failures(account['entity_name'])
+                UpdateBillingMetrics.push_billing_account_failure_total()
 
 
 if __name__ == '__main__':
+    UpdateBillingMetrics.push_metrics()
     main()
