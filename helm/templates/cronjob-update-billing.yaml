@@ -3,6 +3,7 @@ apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: ibm-update-billing
+  namespace: {{ include "ibm-sandbox-cleanup.namespaceName" . }}
   labels:
     {{- include "ibm-sandbox-cleanup.labels" . | nindent 4 }}
 spec:

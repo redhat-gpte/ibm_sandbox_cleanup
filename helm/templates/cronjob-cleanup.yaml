@@ -3,6 +3,7 @@ apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: {{ include "ibm-sandbox-cleanup.name" . }}
+  namespace: {{ include "ibm-sandbox-cleanup.namespaceName" . }}
   labels:
     {{- include "ibm-sandbox-cleanup.labels" . | nindent 4 }}
 spec:
