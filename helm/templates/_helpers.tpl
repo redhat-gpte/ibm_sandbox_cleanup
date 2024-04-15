@@ -9,7 +9,7 @@ Expand the name of the chart.
 Create the name of the namespace to use
 */}}
 {{- define "ibm-sandbox-cleanup.namespaceName" -}}
-{{- default (include "ibm-sandbox-cleanup.name" .) .Values.namespace.name }}
+{{- include "ibm-sandbox-cleanup.name" . }}
 {{- end -}}
 
 

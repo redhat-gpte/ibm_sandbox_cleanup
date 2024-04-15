@@ -15,8 +15,13 @@ version: 0.3.12
 # incremented each time you make changes to the application.
 appVersion: 0.3.12
 
+# dependencies:
+#   - name: prometheus-pushgateway
+#     version: v1.21.1
+#     repository: "https://prometheus-community.github.io/helm-charts"
+#     condition: prometheus-pushgateway.enabled
 dependencies:
   - name: prometheus-pushgateway
-    version: v1.8.0
-    repository: "https://prometheus-community.github.io/helm-charts"
+    version: v1.21.1
+    repository: "file://./charts/prometheus-pushgateway"
     condition: prometheus-pushgateway.enabled
