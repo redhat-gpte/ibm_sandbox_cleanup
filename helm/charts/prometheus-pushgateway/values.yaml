@@ -178,10 +178,10 @@ runAsStatefulSet: false
 
 ## Security context to be added to push-gateway pods
 ##
-securityContext:
-  fsGroup: 1000770000
-  runAsUser: 1000770000
-  runAsNonRoot: true
+securityContext: {}
+  # fsGroup: 1000770000
+  # runAsUser: 1000770000
+  # runAsNonRoot: true
 
 ## Security context to be added to push-gateway containers
 ## Having a separate variable as securityContext differs for pods and containers.
