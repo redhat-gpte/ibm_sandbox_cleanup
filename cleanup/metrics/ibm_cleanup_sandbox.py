@@ -36,15 +36,6 @@ class CleanUpSandboxMetrics(AppMetrics):
         else:
             labels = {'instance': instance, 'job_name': job_name}
 
-        print(labels)
-        # labels_names = ['instance']
-        # labels_values = [instance, job_name]
-        # if labels and isinstance(labels, dict):
-        #     for k, v in labels.items():
-        #         labels_names.append(k)
-        #         labels_values.append(v)
-
-        # print(labels_names)
         attribute = getattr(cls, metric_name)
         attribute.labels(**labels).set(value)
         cls.push_metrics()
