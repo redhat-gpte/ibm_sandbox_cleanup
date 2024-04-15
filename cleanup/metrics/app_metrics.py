@@ -35,6 +35,6 @@ class AppMetrics:
             return
         job_name = cls.__name__
         try:
-            push_to_gateway(pushgateway_url, job=job_name, registry=REGISTRY)
+            push_to_gateway(pushgateway_url, job=job_name, registry=REGISTRY, timeout=10)
         except Exception as e:
             logger.error(f"Failed to push metrics: {str(e)}")
