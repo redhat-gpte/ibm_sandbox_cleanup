@@ -42,10 +42,7 @@ prometheus-pushgateway:
   fullnameOverride: prometheus-pushgateway
   namespaceOverride: ibm-sandbox-cleanup
   runAsStatefulSet: false
-  securityContext:
-    fsGroup: 65534
-    runAsUser: 65534
-    runAsNonRoot: true
+  securityContext: {}
   service:
     namespace: ibm-sandbox-cleanup
     type: ClusterIP
