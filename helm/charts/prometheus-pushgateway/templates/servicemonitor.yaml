@@ -4,9 +4,6 @@ kind: ServiceMonitor
 metadata:
   name: {{ template "prometheus-pushgateway.fullname" .  }}
   namespace: {{ include "prometheus-pushgateway.namespace" . }}
-  {{- if .Values.serviceMonitor.namespace }}
-  namespace: {{ .Values.serviceMonitor.namespace }}
-  {{- end }}
   labels:
 {{ template "prometheus-pushgateway.defaultLabels" merge (dict "extraLabels" .Values.serviceMonitor.additionalLabels) .  }}
 spec:
