@@ -1,0 +1,62 @@
+{{- if .Values.deploy }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: ibm-update-billing
+  labels:
+    {{- include "ibm-sandbox-cleanup.labels" . | nindent 4 }}
+spec:
+  schedule: "15 * * * *"
+  concurrencyPolicy: "Forbid"
+  suspend: {{ .Values.suspendCronJob }}
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: ibm-update-billing
+            image: "{{ .Values.image.repository }}:v{{ .Values.image.tag | default .Chart.AppVersion }}"
+            imagePullPolicy: IfNotPresent
+            command: ["python"]
+            args: ["/opt/app-root/src/update-billing.py"]
+            env:
+              - name: AWS_ACCESS_KEY_ID
+                valueFrom:
+                  secretKeyRef:
+                    key: aws_access_key_id
+                    name: ibm-sandbox-cleanup-dynamodb
+              - name: AWS_SECRET_ACCESS_KEY
+                valueFrom:
+                  secretKeyRef:
+                    key: aws_secret_access_key
+                    name: {{ include "ibm-sandbox-cleanup.name" . }}-dynamodb
+              - name: AWS_REGION
+                valueFrom:
+                  secretKeyRef:
+                    key: aws_region
+                    name: {{ include "ibm-sandbox-cleanup.name" . }}-dynamodb
+              - name: CLOUD_PROVIDER
+                value: "{{ .Values.cloudProvider }}"
+              - name: ENTERPRISE_ACCOUNT_ID
+                valueFrom:
+                  secretKeyRef:
+                    key: enterprise_account_id
+                    name: ibm-billing-enterprise-credential
+              - name: ENTERPRISE_API_KEY
+                valueFrom:
+                  secretKeyRef:
+                    key: enterprise_api_key
+                    name: ibm-billing-enterprise-credential
+              - name: BILLING_TABLE
+                valueFrom:
+                  secretKeyRef:
+                    key: billing_table
+                    name: ibm-billing-enterprise-credential
+              {{- if ".Values.prometheus-pushgateway.enabled" }}
+              - name: PUSH_GATEWAY_URL
+                value: "{{ .Release.Name }}-prometheus-pushgateway.{{ .Release.Namespace }}.svc.cluster.local:9091"
+              {{- end }}
+          restartPolicy: Never
+{{- end }}
