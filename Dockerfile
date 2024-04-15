@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi8/python-38:latest
+FROM registry.access.redhat.com/ubi9/python-311:latest
   
 MAINTAINER Nate Stephany <nate@redhat.com>
 

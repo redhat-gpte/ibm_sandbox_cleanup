@@ -12,10 +12,13 @@ parameters:
   value: ibm-sandbox-cleanup
 - name: PYTHON_S2I_IMAGE
   required: true
-  value: registry.access.redhat.com/ubi8/python-38:latest
+  value: registry.access.redhat.com/ubi9/python-311:latest
 - name: GIT_REPO
   required: true
   value: https://github.com/redhat-gpte/ibm-sandbox-cleanup.git
+- name: GIT_REF
+  required: true
+  value: fix-cleanup
 - name: CONTEXT_DIR
   value: cleanup
 
@@ -41,6 +44,7 @@ objects:
       contextDir: ${CONTEXT_DIR}
       git:
         uri: ${GIT_REPO}
+        ref: ${GIT_REF}
       type: Git
     strategy:
       type: Source

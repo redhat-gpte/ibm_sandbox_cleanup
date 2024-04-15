@@ -2,6 +2,13 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
+deploy: true
+
+suspendCronJob: true
+cloudProvider: "ibm"
+sandboxAssignmentAPI:
+  url:  http://sandbox-assignment-api.sandbox-assignment-api.svc:8080
+
 nameOverride: ""
 fullnameOverride: ""
 
@@ -12,17 +19,6 @@ image:
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
   tag: ""
-
-# pushGateway: ...
-
-# dynamodbSecret:
-#   aws_region: ...
-#   aws_access_key_id: ...
-#   aws_secret_access_key ...
-
-# sandboxAssignmentAPI:
-#   url: ...
-#   api_key: ...
 
 resources:
   limits:
@@ -37,3 +33,31 @@ nodeSelector: {}
 tolerations: []
 
 affinity: {}
+
+# https://github.com/prometheus-community/helm-charts/blob/main/charts/prometheus-pushgateway/values.yaml
+prometheus-pushgateway:
+  enabled: true
+  runAsStatefulSet: false
+  securityContext:
+    fsGroup: 65534
+    runAsUser: 65534
+    runAsNonRoot: true
+  service:
+    type: ClusterIP
+    port: 9091
+  persistence:
+    enabled: false
+    mountPath: /data
+    size: 2Gi
+  resources:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    scrapeTimeout: 10s
+    namespace: ibm-sandbox-cleanup

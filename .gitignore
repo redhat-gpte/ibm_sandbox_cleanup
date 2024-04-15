@@ -1,1 +1,7 @@
 __pycache__
+.odo
+venv
+.venv
+virtualenv
+varsrc
+.idea
