@@ -47,7 +47,7 @@ spec:
                     name: {{ include "ibm-sandbox-cleanup.name" . }}-saa-credential
               {{- if ".Values.prometheus-pushgateway.enabled" }}
               - name: PUSH_GATEWAY_URL
-                value: "{{ .Release.Name }}-prometheus-pushgateway.{{ .Release.Namespace }}.svc.cluster.local:9091"
+                value: "prometheus-pushgateway.{{ include "ibm-sandbox-cleanup.namespaceName" . }}.svc.cluster.local:9091"
               {{- end }}
           restartPolicy: Never
 {{- end }}
