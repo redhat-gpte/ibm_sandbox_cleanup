@@ -52,12 +52,12 @@ def create_record(db, billing_table, billing_ttl, **kwargs):
 def main():
     enterprice_api_key = os.environ.get('ENTERPRISE_API_KEY')
     if enterprice_api_key is None:
-        print("API key must be provided.")
+        print("API key must be provided (env ENTERPRISE_API_KEY).")
         return None
 
     enterprice_account_id = os.environ.get('ENTERPRISE_ACCOUNT_ID')
     if enterprice_account_id is None:
-        print("Account ID must be provided.")
+        print("Account ID must be provided (env ENTERPRISE_ACCOUNT_ID).")
         return None
 
     aws_access_key_id = os.environ.get('AWS_ACCESS_KEY_ID')
@@ -65,7 +65,7 @@ def main():
     aws_region = os.environ.get('AWS_REGION', 'us-west-2')
 
     if aws_access_key_id is None or aws_secret_access_key is None:
-        print("AWS credentials must be provided.")
+        print("AWS credentials must be provided (env AWS_ACCESS_KEY_ID or AWS_SECRET_ACCESS_KEY).")
         return None
 
     billing_table = os.environ.get('BILLING_TABLE', 'sandbox_billing')
@@ -86,7 +86,7 @@ def main():
     usage_reporter = EnterpriseUsageReportsV1(authenticator=authenticator)
 
     account_groups = account_manager.list_account_groups(
-        top_level_id=enterprice_account_id).get_result()['resources']
+        enterprise_id=enterprice_account_id).get_result()['resources']
 
     for ag in account_groups:
         logger.info(f"Getting billing for account group {ag['name']}")
