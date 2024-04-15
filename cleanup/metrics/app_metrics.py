@@ -1,16 +1,18 @@
 import os
-import logging
-from prometheus_client import Gauge, Counter, Summary, push_to_gateway, REGISTRY
 from functools import wraps
+import logging
+from prometheus_client import Summary, push_to_gateway, REGISTRY
 
 
 logger = logging.getLogger(__name__)
 
 
 class AppMetrics:
-    request_latency_seconds = Summary('request_latency_seconds',
-                                      'Time spent processing request',
-                                      ['method_name'])
+    request_latency_seconds = Summary(
+        'request_latency_seconds',
+        'Time spent processing request',
+        ['method_name']
+        )
 
     @classmethod
     def record_request_latency(cls, func):
