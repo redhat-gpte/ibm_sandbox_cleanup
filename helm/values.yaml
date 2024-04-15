@@ -9,8 +9,9 @@ cloudProvider: "ibm"
 sandboxAssignmentAPI:
   url:  http://sandbox-assignment-api.sandbox-assignment-api.svc:8080
 
-nameOverride: ""
-fullnameOverride: ""
+nameOverride: "ibm-sandbox-cleanup"
+fullnameOverride: "ibm-sandbox-cleanup"
+# namespaceOverride: "ibm-sandbox-cleanup"
 
 replicaCount: 1
 
@@ -34,19 +35,23 @@ tolerations: []
 
 affinity: {}
 
+
 # https://github.com/prometheus-community/helm-charts/blob/main/charts/prometheus-pushgateway/values.yaml
 prometheus-pushgateway:
   enabled: true
+  fullnameOverride: prometheus-pushgateway
+  namespaceOverride: ibm-sandbox-cleanup
   runAsStatefulSet: false
   securityContext:
     fsGroup: 65534
     runAsUser: 65534
     runAsNonRoot: true
   service:
+    namespace: ibm-sandbox-cleanup
     type: ClusterIP
     port: 9091
-  persistence:
-    enabled: false
+  persistentVolume:
+    enabled: True
     mountPath: /data
     size: 2Gi
   resources:
@@ -56,8 +61,8 @@ prometheus-pushgateway:
     requests:
       cpu: 50m
       memory: 64Mi
-  serviceMonitor:
-    enabled: true
-    interval: 30s
-    scrapeTimeout: 10s
-    namespace: ibm-sandbox-cleanup
+
+serviceMonitor:
+  enabled: true
+  interval: 30s
+  scrapeTimeout: 10s

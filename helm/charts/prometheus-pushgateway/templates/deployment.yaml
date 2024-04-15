@@ -1,0 +1,26 @@
+{{- if not .Values.runAsStatefulSet }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ template "prometheus-pushgateway.fullname" . }}
+  namespace: {{ include "prometheus-pushgateway.namespace" . }}
+  labels:
+{{ template "prometheus-pushgateway.defaultLabels" merge (dict "extraLabels" .Values.podLabels) .  }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  {{- if .Values.strategy }}
+  strategy:
+    {{ toYaml .Values.strategy | nindent 4 }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "prometheus-pushgateway.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+{{ template "prometheus-pushgateway.defaultLabels" merge (dict "extraLabels" .Values.podLabels "indent" 8) . }}
+      annotations:
+        {{- toYaml .Values.podAnnotations | nindent 8 }}
+    spec:
+      {{ include "prometheus-pushgateway.podSpec" . }}
+{{- end -}}
