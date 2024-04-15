@@ -57,7 +57,7 @@ spec:
                     name: ibm-billing-enterprise-credential
               {{- if ".Values.prometheus-pushgateway.enabled" }}
               - name: PUSH_GATEWAY_URL
-                value: "prometheus-pushgateway.{{ include "ibm-sandbox-cleanup.namespaceName" . }}.svc.cluster.local:9091"
+                value: "http://prometheus-pushgateway.{{ include "ibm-sandbox-cleanup.namespaceName" . }}.svc.cluster.local:9091"
               {{- end }}
           restartPolicy: Never
 {{- end }}
