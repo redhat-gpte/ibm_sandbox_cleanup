@@ -93,7 +93,7 @@ def delete_instance_groups(service):
 
 
 def get_instance_templates(service):
-    instance_templates = service.list_instance_templates(limit=100).get_result()[
+    instance_templates = service.list_instance_templates().get_result()[
         'templates']
     response = []
     for it in instance_templates:
@@ -792,7 +792,7 @@ def delete_rhoic_clusters(api_key):
 
     if rhoic_cluster_deleted:
         logging.info(
-            f"Sleeping for 10 minutes to wait for RHOIC clusters to delete")
+            "Sleeping for 10 minutes to wait for RHOIC clusters to delete")
         sleep(600)
 
     remaining_rhoic_clusters = get_rhoic_clusters(api_key)
@@ -805,7 +805,7 @@ def delete_rhoic_clusters(api_key):
         remaining_rhoic_clusters = get_rhoic_clusters(api_key)
 
     if remaining_rhoic_clusters:
-        logging.error(f"RHOIC clusters could not be cleaned up")
+        logging.error("RHOIC clusters could not be cleaned up")
     else:
         logging.info("No RHOIC clusters found.")
 

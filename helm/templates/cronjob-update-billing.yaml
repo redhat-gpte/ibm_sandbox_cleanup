@@ -1,4 +1,5 @@
 {{- if .Values.deploy }}
+{{- if not .Values.suspendCronJob -}}
 apiVersion: batch/v1
 kind: CronJob
 metadata:
@@ -60,4 +61,5 @@ spec:
                 value: "http://prometheus-pushgateway.{{ include "ibm-sandbox-cleanup.namespaceName" . }}.svc.cluster.local:9091"
               {{- end }}
           restartPolicy: Never
+{{- end }}
 {{- end }}
