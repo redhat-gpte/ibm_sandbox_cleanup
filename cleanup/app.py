@@ -49,13 +49,13 @@ def clean_accounts(saa_api_key, saa_url, account_to_clean=None):
     saa_token = get_token(saa_api_key, saa_url)
     need_clean_accounts = get_accounts(saa_url, saa_token, 'cleanup')
     if need_clean_accounts:
-        logging.info("Accounts needing cleanup:")
-        logging.info(need_clean_accounts)
+        logging.info(f"Accounts needing cleanup: {need_clean_accounts}")
         for account in need_clean_accounts:
             cloud_provider = account['cloud_provider']['S']
             account_name = account['account_name']['S']
 
-            if account_name and account_name != account_to_clean:
+            if account_to_clean and account_name != account_to_clean:
+                logging.info(f"Skipping account {account_name}")
                 continue
 
             ibm_api_key = account['master_api_key']['S']
@@ -102,8 +102,7 @@ def verify_accounts(saa_api_key, saa_url, account_to_verify=None):
     need_verify_accounts = get_accounts(saa_url, saa_token, 'verify')
 
     if need_verify_accounts:
-        logging.info("Accounts needing verification:")
-        logging.info(need_verify_accounts)
+        logging.info(f"Accounts needing verification: {need_verify_accounts}")
         for account in need_verify_accounts:
             account_name = account['account_name']['S']
 
@@ -113,7 +112,7 @@ def verify_accounts(saa_api_key, saa_url, account_to_verify=None):
             cloud_provider = account['cloud_provider']['S']
             logging.info(f"Starting verification of account {account_name}")
             cleanup_time = datetime.fromisoformat(account['cleanup_time']['S'])
-            verification_time = cleanup_time + timedelta(hours=24)
+            verification_time = cleanup_time + timedelta(hours=8)
             labels = {'account': account_name, 'cloud_provider': cloud_provider}
             if datetime.now(timezone.utc) >= verification_time:
                 logging.info(f"Evaluating account {account['account_name']['S']}.")
@@ -134,6 +133,7 @@ def verify_accounts(saa_api_key, saa_url, account_to_verify=None):
                         "#t": "timestamp"
                     }
                 )
+                no_current_usage = False
 
                 if previous_usage['Items']:
                     logging.info(
@@ -142,7 +142,7 @@ def verify_accounts(saa_api_key, saa_url, account_to_verify=None):
                     logging.error(
                         f"There is no previous usage data for {account_name}"
                     )
-                    return
+                    no_current_usage = True
 
                 current_usage_time = (datetime.now(timezone.utc) - timedelta(minutes=20)).strftime('%Y-%m-%dT%H')
                 logging.info(f"Current usage timestamp is {current_usage_time}")
@@ -169,12 +169,16 @@ def verify_accounts(saa_api_key, saa_url, account_to_verify=None):
                     logging.error(
                         f"There is no current usage data for {account_name}"
                     )
-                    return
+                    no_current_usage = True
 
-                current_cost = float(
-                    current_usage['Items'][0]['billable_cost']['N'])
-                previous_cost = float(
-                    previous_usage['Items'][0]['billable_cost']['N'])
+                if no_current_usage:
+                    current_cost = 0
+                    previous_cost = 0
+                else:
+                    current_cost = float(
+                        current_usage['Items'][0]['billable_cost']['N'])
+                    previous_cost = float(
+                        previous_usage['Items'][0]['billable_cost']['N'])
 
                 CleanUpSandboxMetrics.push_clean_metrics('ibm_current_usage',
                                                          current_cost,
