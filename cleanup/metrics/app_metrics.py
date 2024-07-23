@@ -1,8 +1,8 @@
+import logging
 import os
 from functools import wraps
-import logging
-from prometheus_client import Summary, push_to_gateway, REGISTRY
 
+from prometheus_client import REGISTRY, Summary, push_to_gateway
 
 logger = logging.getLogger(__name__)
 
@@ -38,3 +38,4 @@ class AppMetrics:
             push_to_gateway(pushgateway_url, job=job_name, registry=REGISTRY, timeout=10)
         except Exception as e:
             logger.error(f"Failed to push metrics: {str(e)}")
+            print(f"Failed to push metrics: {str(e)}")

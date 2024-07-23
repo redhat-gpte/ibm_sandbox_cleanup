@@ -1,11 +1,12 @@
-import os
-from datetime import datetime, timezone, timedelta
 import logging
-from ibm_cloud_sdk_core.authenticators import IAMAuthenticator
-from ibm_platform_services.enterprise_usage_reports_v1 import EnterpriseUsageReportsV1
-from ibm_platform_services.enterprise_management_v1 import EnterpriseManagementV1
-import boto3
+import os
+from datetime import datetime, timedelta, timezone
 
+import boto3
+from ibm_cloud_sdk_core.api_exception import ApiException
+from ibm_cloud_sdk_core.authenticators import IAMAuthenticator
+from ibm_platform_services.enterprise_management_v1 import EnterpriseManagementV1
+from ibm_platform_services.enterprise_usage_reports_v1 import EnterpriseUsageReportsV1
 from metrics import UpdateBillingMetrics
 
 logger = logging.getLogger()
@@ -93,11 +94,18 @@ def main():
     for ag in account_groups:
         logger.info(f"Getting billing for account group {ag['name']}")
         billing_ttl = datetime.now() + timedelta(days=61)
-        usage = usage_reporter.get_resource_usage_report(account_group_id=ag['id'],
-                                                         month=billing_month,
-                                                         children=True,
-                                                         limit=100
-                                                         ).get_result()['reports']
+        try:
+            usage = usage_reporter.get_resource_usage_report(account_group_id=ag['id'],
+                                                             month=billing_month,
+                                                             children=True,
+                                                             limit=100
+                                                             ).get_result()['reports']
+        except ApiException:
+            logger.error(f"Failed to get billing for account group {ag['name']}")
+            print(f"Failed to get billing for account group {ag['name']}. Skipping.")
+            UpdateBillingMetrics.push_billing_account_failure_total()
+            continue
+
         for account in usage:
             logger.info(f"Updating billing for account {account['entity_name']}")
 
