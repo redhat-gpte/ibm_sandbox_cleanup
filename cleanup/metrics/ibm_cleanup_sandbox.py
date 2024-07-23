@@ -1,5 +1,6 @@
 from __future__ import annotations
-from prometheus_client import Counter, Gauge
+
+from prometheus_client import Gauge
 
 from metrics import AppMetrics
 

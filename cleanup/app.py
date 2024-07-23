@@ -1,14 +1,14 @@
-import os
-import sys
-from datetime import datetime, timezone, timedelta
 import argparse
 import json
 import logging
+import os
+import sys
+from datetime import datetime, timedelta, timezone
+
+import boto3
+import clean_ibm_sandbox
 import urllib3
 from metrics import CleanUpSandboxMetrics
-import boto3
-
-import clean_ibm_sandbox
 
 
 def get_token(saa_api_key, saa_url):
@@ -73,7 +73,7 @@ def clean_accounts(saa_api_key, saa_url, account_to_clean=None):
                     f"Account {account['account_name']} in cloud provider {account['cloud_provider']} could not be fully cleaned.")
                 clean_status = 1
 
-                CleanUpSandboxMetrics.push_clean_metrics('ibm_clean_accounts', clean_status, 'check_cleanup', labels)
+            CleanUpSandboxMetrics.push_clean_metrics('ibm_clean_accounts', clean_status, 'check_cleanup', labels)
     else:
         logging.info("No accounts need cleanup.")
         return
@@ -256,9 +256,17 @@ def main(api_key=None, account=None):
 
     CleanUpSandboxMetrics.push_metrics()
 
-    clean_accounts(saa_api_key, saa_url, account_to_clean=account)
+    try:
+        clean_accounts(saa_api_key, saa_url, account_to_clean=account)
+    except Exception as e:
+        logging.error(f"Error cleaning accounts: {e}")
+        pass
 
-    verify_accounts(saa_api_key, saa_url, account_to_verify=account)
+    try:
+        verify_accounts(saa_api_key, saa_url, account_to_verify=account)
+    except Exception as e:
+        logging.error(f"Error verifying accounts: {e}")
+        pass
 
 
 if __name__ == "__main__":
