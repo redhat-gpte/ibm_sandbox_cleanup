@@ -48,7 +48,7 @@ fi
 sed -i'' -e "s/^version: .*/version: ${RELEASE}/" helm/Chart.yaml
 sed -i'' -e "s/^appVersion: .*/appVersion: ${RELEASE}/" helm/Chart.yaml
 
-git add "${HELM_DIR}/Chart.yaml"
+git add helm/Chart.yaml
 git commit -m "${TAG}"
 git tag $TAG
 git push origin main $TAG
