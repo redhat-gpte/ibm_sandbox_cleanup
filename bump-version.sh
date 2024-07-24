@@ -37,15 +37,16 @@ if [[ -n "$(git status --porcelain | grep -v '^?? ')" ]]; then
 fi
 
 read -p "Make release ${RELEASE}? (Y/N) " CONTINUE
+CONTINUE=$(echo "$CONTINUE" | tr '[:lower:]' '[:upper:]')
 
-if [[ "${CONTINUE^^}" != "Y" ]]; then
+if [[ "$CONTINUE" != "Y" ]]; then
+  echo "Invalid input. Please enter Y or y."
   exit 1
 fi
 
 # Set version and appVersion in helm chart
-HELM_DIR=$(dirname $0)/helm
-sed -i "s/^version: .*/version: ${RELEASE}/" "${HELM_DIR}/Chart.yaml"
-sed -i "s/^appVersion: .*/appVersion: ${VERSION}/" "${HELM_DIR}/Chart.yaml"
+sed -i'' -e "s/^version: .*/version: ${RELEASE}/" helm/Chart.yaml
+sed -i'' -e "s/^appVersion: .*/appVersion: ${RELEASE}/" helm/Chart.yaml
 
 git add "${HELM_DIR}/Chart.yaml"
 git commit -m "${TAG}"
