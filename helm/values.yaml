@@ -4,6 +4,7 @@
 
 deploy: true
 
+disableUpdateBilling: true
 suspendCronJob: true
 cloudProvider: "ibm"
 sandboxAssignmentAPI:
