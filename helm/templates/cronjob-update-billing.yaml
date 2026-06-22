@@ -1,5 +1,5 @@
 {{- if .Values.deploy }}
-{{- if not .Values.suspendCronJob -}}
+{{- if not .Values.disableUpdateBilling -}}
 apiVersion: batch/v1
 kind: CronJob
 metadata:
